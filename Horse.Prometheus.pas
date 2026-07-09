@@ -74,14 +74,29 @@ var
   LKey: string;
   LParts: TArray<string>;
   LMethod, LRoute, LStatus: string;
+  LFormatSettings: TFormatSettings;
+
+  procedure AppendLineLF(const AText: string);
+  begin
+    LSB.Append(AText).Append(#10);
+  end;
+
 begin
+  // Configura formato invariante (ponto como separador decimal) para compatibilidade com o parser do Prometheus
+  {$IF DEFINED(FPC)}
+  LFormatSettings := DefaultFormatSettings;
+  {$ELSE}
+  LFormatSettings := TFormatSettings.Invariant;
+  {$ENDIF}
+  LFormatSettings.DecimalSeparator := '.';
+
   LSB := TStringBuilder.Create;
   try
     FLock.Enter;
     try
       // HELP e TYPE para http_requests_total
-      LSB.AppendLine('# HELP http_requests_total Total number of HTTP requests processed.');
-      LSB.AppendLine('# TYPE http_requests_total counter');
+      AppendLineLF('# HELP http_requests_total Total number of HTTP requests processed.');
+      AppendLineLF('# TYPE http_requests_total counter');
       for LPairTotal in FRequestsTotal do
       begin
         LKey := LPairTotal.Key;
@@ -91,13 +106,13 @@ begin
           LMethod := LParts[0];
           LRoute := LParts[1];
           LStatus := LParts[2];
-          LSB.AppendLine(Format('http_requests_total{method="%s",route="%s",status="%s"} %d', [LMethod, LRoute, LStatus, LPairTotal.Value]));
+          AppendLineLF(Format('http_requests_total{method="%s",route="%s",status="%s"} %d', [LMethod, LRoute, LStatus, LPairTotal.Value]));
         end;
       end;
 
       // HELP e TYPE para http_request_duration_seconds
-      LSB.AppendLine('# HELP http_request_duration_seconds HTTP request latencies in seconds.');
-      LSB.AppendLine('# TYPE http_request_duration_seconds summary');
+      AppendLineLF('# HELP http_request_duration_seconds HTTP request latencies in seconds.');
+      AppendLineLF('# TYPE http_request_duration_seconds summary');
       for LPairDuration in FRequestDurationSum do
       begin
         LKey := LPairDuration.Key;
@@ -106,16 +121,16 @@ begin
         begin
           LMethod := LParts[0];
           LRoute := LParts[1];
-          LSB.AppendLine(Format('http_request_duration_seconds_sum{method="%s",route="%s"} %f', [LMethod, LRoute, LPairDuration.Value]));
+          AppendLineLF(Format('http_request_duration_seconds_sum{method="%s",route="%s"} %f', [LMethod, LRoute, LPairDuration.Value], LFormatSettings));
           if FRequestDurationCount.ContainsKey(LKey) then
-            LSB.AppendLine(Format('http_request_duration_seconds_count{method="%s",route="%s"} %d', [LMethod, LRoute, FRequestDurationCount.Items[LKey]]));
+            AppendLineLF(Format('http_request_duration_seconds_count{method="%s",route="%s"} %d', [LMethod, LRoute, FRequestDurationCount.Items[LKey]]));
         end;
       end;
 
       // HELP e TYPE para http_active_requests
-      LSB.AppendLine('# HELP http_active_requests Number of currently active HTTP requests.');
-      LSB.AppendLine('# TYPE http_active_requests gauge');
-      LSB.AppendLine(Format('http_active_requests %d', [FActiveRequests]));
+      AppendLineLF('# HELP http_active_requests Number of currently active HTTP requests.');
+      AppendLineLF('# TYPE http_active_requests gauge');
+      AppendLineLF(Format('http_active_requests %d', [FActiveRequests]));
     finally
       FLock.Leave;
     end;
