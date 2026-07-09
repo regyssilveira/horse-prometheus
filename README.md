@@ -120,6 +120,26 @@ O projeto já inclui um arquivo de configuração Docker pronto para levantar o 
 3. O painel do **Prometheus** estará disponível em: 👉 **[http://localhost:9090](http://localhost:9090)**
 4. O painel do **Grafana** estará disponível em: 👉 **[http://localhost:3000](http://localhost:3000)** (Usuário: `admin` | Senha: `admin`)
 
+
+
+---
+
+## 📊 Visualização no Prometheus e Grafana
+
+Abaixo estão explicadas as duas principais telas de observabilidade disponíveis após rodar os testes e popular a stack local:
+
+### 1. Painel de Consulta do Prometheus (Expression Browser)
+Permite executar queries PromQL diretamente no banco de dados e obter visualizações rápidas de gráficos brutos para validar se as métricas da sua API Horse estão sendo recebidas corretamente.
+
+![Painel do Prometheus](docs/prometheus.png)
+
+---
+
+### 2. Dashboard do Grafana
+Se conecta ao Prometheus para construir dashboards modernos, dinâmicos e completos. Com as métricas geradas por este middleware, você pode criar belíssimos gráficos de chamadas HTTP por segundo, distribuição de status code e latência.
+
+![Dashboard do Grafana](docs/grafana.png)
+
 ---
 
 ## 🧪 Como Executar os Testes
