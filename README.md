@@ -6,6 +6,15 @@ Este middleware coleta e expõe métricas de performance e tráfego de forma aut
 
 ---
 
+## 📈 O que são Prometheus e Grafana?
+
+Para compreender como este middleware ajuda a monitorar sua aplicação, é importante conhecer o papel de cada uma das ferramentas:
+
+* **Prometheus**: É uma ferramenta de monitoramento e banco de dados de séries temporais (TSDB) de código aberto. Ele funciona no modelo de coleta ativa por *scraping* (pull), ou seja, ele busca periodicamente os dados de métricas expostos pelo middleware em um endpoint de texto puro (padrão `/metrics`) na sua API e os armazena para análise.
+* **Grafana**: É a plataforma de visualização líder no mercado. Ele se conecta ao Prometheus para consumir esses dados temporais brutos e os converte em painéis gráficos (dashboards) inteligentes e dashboards dinâmicos, facilitando o monitoramento de tráfego, latência e erros em tempo real.
+
+---
+
 ## 💡 Quando usar?
 
 Você deve utilizar este middleware quando precisar de:
