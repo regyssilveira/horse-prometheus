@@ -1,0 +1,25 @@
+# Delphi/C++Builder
+__history/
+__recovery/
+*.dcu
+*.exe
+*.dll
+*.bpl
+*.dcp
+*.local
+*.identcache
+*.tvsconfig
+*.dsk
+*.stat
+*.~*
+*.map
+*.rsm
+
+# Lazarus / FPC
+lib/
+backup/
+*.lps
+*.ppu
+*.o
+*.or
+modules/

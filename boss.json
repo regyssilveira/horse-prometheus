@@ -1,0 +1,8 @@
+{
+  "name": "horse-prometheus",
+  "description": "Prometheus middleware for Horse",
+  "version": "1.0.0",
+  "dependencies": {
+    "horse": "git@github.com:HashLoad/horse.git"
+  }
+}
