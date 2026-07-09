@@ -1,30 +1,70 @@
 # horse-prometheus
 
-Prometheus middleware for **Horse**.
+Middleware de **Prometheus** para o framework web **Horse**.
 
-Allows you to monitor your Delphi APIs using Prometheus and Grafana.
+Este middleware coleta e expõe métricas de performance e tráfego de forma automática no padrão do Prometheus, facilitando o monitoramento de APIs Delphi e Lazarus (FPC).
 
-## ⚙️ Installation
+---
 
-Use the [Boss](https://github.com/HashLoad/boss) package manager:
+## 💡 Quando usar?
 
+Você deve utilizar este middleware quando precisar de:
+1. **Monitoramento de Volume (Tráfego)**: Acompanhar o número total de requisições HTTP recebidas por método, rota e código de status.
+2. **Análise de Latência**: Medir o tempo de processamento de cada rota para identificar lentidões e gargalos de performance.
+3. **Métricas de Concorrência**: Monitorar a quantidade de requisições que estão sendo processadas simultaneamente no servidor.
+4. **Dashboards de Observabilidade**: Integrar suas APIs Delphi/Lazarus com coletores Prometheus e gerar painéis gráficos no Grafana.
+
+---
+
+## ⚙️ Como funciona?
+
+O middleware intercepta as requisições HTTP e serve o endpoint de métricas de forma transparente:
+1. **Interceptação de Métricas**: Quando uma requisição atinge o caminho configurado (padrão: `/metrics`), o middleware responde imediatamente com os dados coletados no formato de texto puro aceito pelo Prometheus, sem repassar a requisição adiante.
+2. **Medição de Tempo (Latência)**: Utiliza `TStopwatch` (no Delphi) ou `TThread.GetTickCount64` (no Lazarus) para garantir medições de tempo precisas do ciclo de vida das rotas de negócio.
+3. **Contagem e Registro Thread-Safe**: Utiliza seções críticas (`TCriticalSection`) para garantir que os dicionários de contadores globais sejam atualizados com segurança em ambientes multithread.
+4. **Métricas Expostas**:
+   - `http_requests_total`: Contador incremental por método, rota e status (ex: `GET /users 200`).
+   - `http_request_duration_seconds`: Mapeamento de latência média (`sum` e `count`) por método e rota.
+   - `http_active_requests`: Quantidade de requisições ativas sendo processadas no exato momento.
+
+---
+
+## 🚀 Instalação
+
+### Via Boss Package Manager
+A forma recomendada de instalação é através do gerenciador de pacotes [Boss](https://github.com/HashLoad/boss) (ou usando a ferramenta do seu ambiente, como `boss4d`):
 ```sh
 boss install horse-prometheus
 ```
 
-## ⚡️ Quick Start
+### Instalação Manual
+Caso prefira, basta clonar este repositório e adicionar o caminho da pasta raiz do projeto no **Search Path** da sua IDE (Delphi ou Lazarus).
 
+---
+
+## 💻 Compatibilidade
+
+Este middleware é 100% compatível com:
+* **Delphi XE3 ou superior** (Win32, Win64, Linux, etc.)
+* **Lazarus / FPC** (modo de sintaxe Delphi)
+
+---
+
+## ⚡ Exemplo Prático de Uso
+
+### Delphi (Usando métodos anônimos)
 ```delphi
 uses
+  System.SysUtils,
   Horse,
   Horse.Prometheus;
 
 begin
-  // Register the Prometheus middleware
+  // Registrar o middleware do Prometheus
   THorse.Use(THorsePrometheus.Middleware);
 
   THorse.Get('/ping',
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: TProc)
+    procedure(Req: THorseRequest; Res: THorseResponse)
     begin
       Res.Send('pong');
     end);
@@ -33,12 +73,63 @@ begin
 end.
 ```
 
-Your metrics will be automatically exposed at the `http://localhost:9000/metrics` endpoint in Prometheus format.
+### Lazarus / FPC (Usando procedimentos convencionais)
+```delphi
+program Server;
 
-## 🔧 Configuration
+{$MODE DELPHI}{$H+}
 
-You can customize the metrics path (default is `/metrics`):
+uses
+  SysUtils, Horse, Horse.Prometheus;
+
+procedure GetPing(Req: THorseRequest; Res: THorseResponse; Next: TNextProc);
+begin
+  Res.Send('pong');
+end;
+
+begin
+  THorse.Use(THorsePrometheus.Middleware);
+  
+  THorse.Get('/ping', GetPing);
+  
+  THorse.Listen(9000);
+end.
+```
+
+---
+
+## 🔧 Configuração Personalizada
+
+Por padrão, as métricas são publicadas no path `/metrics`. É possível personalizar este caminho utilizando o método:
 
 ```delphi
-THorsePrometheus.SetMetricsPath('custom-metrics-path');
+THorsePrometheus.SetMetricsPath('meu-path-customizado');
 ```
+
+---
+
+## 🐳 Como Configurar o Prometheus e Grafana Local
+
+O projeto já inclui um arquivo de configuração Docker pronto para levantar o ecossistema de observabilidade localmente na pasta [docker/](file:///d:/Delphi/horse-prometheus/docker/).
+
+1. Abra o terminal e navegue até a pasta `docker/` do projeto.
+2. Execute o comando:
+   ```bash
+   docker compose up -d
+   ```
+3. O painel do **Prometheus** estará disponível em: 👉 **[http://localhost:9090](http://localhost:9090)**
+4. O painel do **Grafana** estará disponível em: 👉 **[http://localhost:3000](http://localhost:3000)** (Usuário: `admin` | Senha: `admin`)
+
+---
+
+## 🧪 Como Executar os Testes Unitários
+
+Para validar o comportamento interno da formatação das métricas, limpeza do path e incremento de contadores:
+
+1. Abra o PowerShell e navegue até a pasta `tests/`.
+2. Execute o script de testes:
+   ```powershell
+   cd tests
+   .\run_tests.ps1
+   ```
+   *O script irá compilar e validar os resultados automaticamente tanto no Delphi (via DCC32) quanto no Lazarus (via FPC), gerando relatórios de acertos e falhas no terminal.*

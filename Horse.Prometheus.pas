@@ -10,13 +10,13 @@ uses
   {$IF DEFINED(FPC)}
     SysUtils, Classes, Generics.Collections, SyncObjs,
   {$ELSE}
-    System.StringHelper, System.SysUtils, System.Classes, System.Generics.Collections, System.SyncObjs,
+    System.SysUtils, System.Classes, System.Generics.Collections, System.SyncObjs, System.Diagnostics,
   {$ENDIF}
   Horse;
 
 type
   THorsePrometheus = class
-  strict private
+  protected
     class var FLock: TCriticalSection;
     class var FRequestsTotal: TDictionary<string, Int64>;
     class var FRequestDurationSum: TDictionary<string, Double>;
@@ -31,6 +31,8 @@ type
     class procedure SetMetricsPath(const AValue: string); static;
     class function Middleware: THorseCallback;
   end;
+
+procedure PrometheusMiddleware(Req: THorseRequest; Res: THorseResponse; Next: {$IF DEFINED(FPC)}TNextProc{$ELSE}TProc{$ENDIF});
 
 implementation
 
@@ -125,78 +127,92 @@ end;
 
 class function THorsePrometheus.Middleware: THorseCallback;
 begin
-  Result :=
-    procedure(Req: THorseRequest; Res: THorseResponse; Next: {$IF DEFINED(FPC)}TNextProc{$ELSE}TProc{$ENDIF})
-    var
-      LStartTime: Int64;
-      LEndTime: Int64;
-      LElapsedSeconds: Double;
-      LPath: string;
-      LMethod: string;
-      LRoute: string;
-      LStatusStr: string;
-      LMetricKeyTotal: string;
-      LMetricKeyDuration: string;
-      LCount: Int64;
-    begin
-      LPath := Req.PathInfo;
-      LMethod := Req.Method;
+  Result := PrometheusMiddleware;
+end;
 
-      // Intercepta e serve o endpoint de métricas diretamente
-      if SameText(LPath, FMetricsPath) then
+procedure PrometheusMiddleware(Req: THorseRequest; Res: THorseResponse; Next: {$IF DEFINED(FPC)}TNextProc{$ELSE}TProc{$ENDIF});
+var
+  {$IF NOT DEFINED(FPC)}
+  LStopwatch: TStopwatch;
+  {$ELSE}
+  LStartTime: Int64;
+  LEndTime: Int64;
+  {$ENDIF}
+  LElapsedSeconds: Double;
+  LPath: string;
+  LMethod: string;
+  LRoute: string;
+  LStatusStr: string;
+  LMetricKeyTotal: string;
+  LMetricKeyDuration: string;
+  LCount: Int64;
+begin
+  LPath := Req.PathInfo;
+  LMethod := Req.Method;
+
+  // Intercepta e serve o endpoint de métricas diretamente
+  if SameText(LPath, THorsePrometheus.FMetricsPath) then
+  begin
+    Res.Send(THorsePrometheus.FormatMetrics).Status(200).ContentType('text/plain; version=0.0.4');
+    Exit;
+  end;
+
+  THorsePrometheus.FLock.Enter;
+  try
+    Inc(THorsePrometheus.FActiveRequests);
+  finally
+    THorsePrometheus.FLock.Leave;
+  end;
+
+  {$IF NOT DEFINED(FPC)}
+  LStopwatch := TStopwatch.StartNew;
+  {$ELSE}
+  LStartTime := TThread.GetTickCount64;
+  {$ENDIF}
+  try
+    Next();
+  finally
+    {$IF NOT DEFINED(FPC)}
+    LStopwatch.Stop;
+    LElapsedSeconds := LStopwatch.Elapsed.TotalSeconds;
+    {$ELSE}
+    LEndTime := TThread.GetTickCount64;
+    LElapsedSeconds := (LEndTime - LStartTime) / 1000.0;
+    {$ENDIF}
+
+    THorsePrometheus.FLock.Enter;
+    try
+      Dec(THorsePrometheus.FActiveRequests);
+
+      LRoute := Req.MatchedRoute;
+      if LRoute = '' then
+        LRoute := LPath; // Fallback se não casou rota específica
+
+      LStatusStr := Res.Status.ToString;
+
+      // Incrementa total de requisições
+      LMetricKeyTotal := LMethod + ':' + LRoute + ':' + LStatusStr;
+      if THorsePrometheus.FRequestsTotal.TryGetValue(LMetricKeyTotal, LCount) then
+        THorsePrometheus.FRequestsTotal.AddOrSetValue(LMetricKeyTotal, LCount + 1)
+      else
+        THorsePrometheus.FRequestsTotal.Add(LMetricKeyTotal, 1);
+
+      // Incrementa soma de duração e contagem
+      LMetricKeyDuration := LMethod + ':' + LRoute;
+      if THorsePrometheus.FRequestDurationSum.ContainsKey(LMetricKeyDuration) then
       begin
-        Res.Send(FormatMetrics).Status(200).ContentType('text/plain; version=0.0.4');
-        Exit;
+        THorsePrometheus.FRequestDurationSum.AddOrSetValue(LMetricKeyDuration, THorsePrometheus.FRequestDurationSum.Items[LMetricKeyDuration] + LElapsedSeconds);
+        THorsePrometheus.FRequestDurationCount.AddOrSetValue(LMetricKeyDuration, THorsePrometheus.FRequestDurationCount.Items[LMetricKeyDuration] + 1);
+      end
+      else
+      begin
+        THorsePrometheus.FRequestDurationSum.Add(LMetricKeyDuration, LElapsedSeconds);
+        THorsePrometheus.FRequestDurationCount.Add(LMetricKeyDuration, 1);
       end;
-
-      FLock.Enter;
-      try
-        Inc(FActiveRequests);
-      finally
-        FLock.Leave;
-      end;
-
-      LStartTime := TThread.GetTickCount64;
-      try
-        Next();
-      finally
-        LEndTime := TThread.GetTickCount64;
-        LElapsedSeconds := (LEndTime - LStartTime) / 1000.0;
-
-        FLock.Enter;
-        try
-          Dec(FActiveRequests);
-
-          LRoute := Req.MatchedRoute;
-          if LRoute = '' then
-            LRoute := LPath; // Fallback se não casou rota específica
-
-          LStatusStr := Res.Status.ToString;
-
-          // Incrementa total de requisições
-          LMetricKeyTotal := LMethod + ':' + LRoute + ':' + LStatusStr;
-          if FRequestsTotal.TryGetValue(LMetricKeyTotal, LCount) then
-            FRequestsTotal.AddOrSetValue(LMetricKeyTotal, LCount + 1)
-          else
-            FRequestsTotal.Add(LMetricKeyTotal, 1);
-
-          // Incrementa soma de duração e contagem
-          LMetricKeyDuration := LMethod + ':' + LRoute;
-          if FRequestDurationSum.ContainsKey(LMetricKeyDuration) then
-          begin
-            FRequestDurationSum.AddOrSetValue(LMetricKeyDuration, FRequestDurationSum.Items[LMetricKeyDuration] + LElapsedSeconds);
-            FRequestDurationCount.AddOrSetValue(LMetricKeyDuration, FRequestDurationCount.Items[LMetricKeyDuration] + 1);
-          end
-          else
-          begin
-            FRequestDurationSum.Add(LMetricKeyDuration, LElapsedSeconds);
-            FRequestDurationCount.Add(LMetricKeyDuration, 1);
-          end;
-        finally
-          FLock.Leave;
-        end;
-      end;
+    finally
+      THorsePrometheus.FLock.Leave;
     end;
+  end;
 end;
 
 end.
