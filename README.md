@@ -122,14 +122,26 @@ O projeto já inclui um arquivo de configuração Docker pronto para levantar o 
 
 ---
 
-## 🧪 Como Executar os Testes Unitários
+## 🧪 Como Executar os Testes
 
+O projeto conta com testes unitários e de integração automatizados para garantir a estabilidade do middleware:
+
+### 1. Testes Unitários
 Para validar o comportamento interno da formatação das métricas, limpeza do path e incremento de contadores:
-
 1. Abra o PowerShell e navegue até a pasta `tests/`.
 2. Execute o script de testes:
    ```powershell
    cd tests
    .\run_tests.ps1
    ```
-   *O script irá compilar e validar os resultados automaticamente tanto no Delphi (via DCC32) quanto no Lazarus (via FPC), gerando relatórios de acertos e falhas no terminal.*
+   *O script irá compilar e validar os resultados automaticamente no Delphi (via DCC32) e no Lazarus (via FPC).*
+
+### 2. Testes de Integração (Ponta a Ponta / E2E)
+Para provar o comportamento real do servidor web respondendo requisições HTTP e registrando as métricas do Prometheus:
+1. Abra o PowerShell e navegue até a pasta `tests/`.
+2. Execute o script de integração:
+   ```powershell
+   cd tests
+   .\test_integration.ps1
+   ```
+   *O script irá compilar o exemplo, iniciar o servidor localmente em segundo plano, disparar requisições simuladas via HTTP, ler o endpoint `/metrics` e validar se os valores dos contadores e latências de resposta correspondem exatamente ao tráfego gerado.*
