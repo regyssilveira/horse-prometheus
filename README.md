@@ -174,3 +174,9 @@ Para provar o comportamento real do servidor web respondendo requisições HTTP 
    .\test_integration.ps1
    ```
    *O script irá compilar o exemplo, iniciar o servidor localmente em segundo plano, disparar requisições simuladas via HTTP, ler o endpoint `/metrics` e validar se os valores dos contadores e latências de resposta correspondem exatamente ao tráfego gerado.*
+
+---
+
+## 📄 Licença
+
+Este projeto está licenciado sob a [Apache License 2.0](LICENSE).

@@ -4,5 +4,6 @@
   "version": "1.0.0",
   "dependencies": {
     "horse": "git@github.com:HashLoad/horse.git"
-  }
+  },
+  "license": "Apache-2.0"
 }
